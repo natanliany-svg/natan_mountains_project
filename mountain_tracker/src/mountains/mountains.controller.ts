@@ -1,0 +1,70 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { MountainsService } from './mountains.service.js';
+import { CreateMountainDto, UpdateMountainDto } from '../entities.dto.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { AdminGuard } from '../auth/guards/admin.guard.js';
+
+// (#36)
+@ApiTags('mountains')
+@Controller('mountains')
+export class MountainsController {
+  // (#36)
+  constructor(private readonly mountainsService: MountainsService) {}
+
+  // (#36)
+  @Get()
+  async findAll() {
+    return await this.mountainsService.findAll();
+  }
+
+  // (#36)
+  @Get('search')
+  async search(@Query('q') q?: string) {
+    return await this.mountainsService.search(q);
+  }
+
+  // (#36)
+  @Get(':id')
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    return await this.mountainsService.findOne(id);
+  }
+
+  // (#37)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Post()
+  async create(@Body() createMountainDto: CreateMountainDto) {
+    return await this.mountainsService.create(createMountainDto);
+  }
+
+  // (#37)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Put(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateMountainDto: UpdateMountainDto,
+  ) {
+    return await this.mountainsService.update(id, updateMountainDto);
+  }
+
+  // (#37)
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Delete(':id')
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    return await this.mountainsService.remove(id);
+  }
+}
