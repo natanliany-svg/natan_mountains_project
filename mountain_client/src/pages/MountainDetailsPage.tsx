@@ -1,22 +1,18 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useParams, Link as RouterLink } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Box,
-  Typography,
-  CardMedia,
-  Paper,
-  Button,
-  TextField,
-  MenuItem,
-  FormControlLabel,
-  Switch,
-  Rating,
   Alert,
-  CircularProgress,
-  IconButton,
+  Box,
+  Button,
+  Checkbox,
+  Chip,
+  Container,
   Divider,
+  FormControlLabel,
+  Paper,
+  TextField,
+  Typography,
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Link as RouterLink, useParams } from 'react-router-dom';
 import { axiosClient, getApiErrorMessage } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import type { Mountain, Review, Trail } from '../types';
@@ -29,12 +25,12 @@ export function MountainDetailsPage() {
   const [mountain, setMountain] = useState<Mountain | null>(null);
   const [trails, setTrails] = useState<Trail[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
   const [trailName, setTrailName] = useState('');
-  const [lengthKm, setLengthKm] = useState('');
-  const [difficulty, setDifficulty] = useState('קל');
+  const [trailLength, setTrailLength] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState('');
+  const [trailDifficulty, setTrailDifficulty] = useState('3');
   const [isCircular, setIsCircular] = useState(false);
   const [showAddTrail, setShowAddTrail] = useState(false);
 
@@ -46,23 +42,18 @@ export function MountainDetailsPage() {
     if (!id) return;
     try {
       setErrorMsg('');
-      const [mountainRes, reviewsRes] = await Promise.all([
+      const [mountainRes, trailsRes, reviewsRes] = await Promise.all([
         axiosClient.get<Mountain>(`/mountains/${id}`),
+        axiosClient.get<Trail[]>(`/mountains/${id}/trails`),
         axiosClient.get<Review[]>(`/mountains/${id}/reviews`),
       ]);
       setMountain(mountainRes.data);
+      setTrails(trailsRes.data);
       setReviews(reviewsRes.data);
-
-      if (user) {
-        const trailsRes = await axiosClient.get<Trail[]>(`/mountains/${id}/trails`);
-        setTrails(trailsRes.data);
-      } else {
-        setTrails([]);
-      }
     } catch {
       setErrorMsg('שגיאה בטעינת נתוני ההר');
     }
-  }, [id, user]);
+  }, [id]);
 
   // (#47)
   useEffect(() => {
@@ -74,22 +65,22 @@ export function MountainDetailsPage() {
     e.preventDefault();
     if (!id) return;
     try {
-      setErrorMsg('');
-      await axiosClient.post('/trails', {
+      await axiosClient.post(`/mountains/${id}/trails`, {
         name: trailName,
-        lengthKm: Number(lengthKm),
-        difficulty,
+        length: Number(trailLength),
+        estimatedTime: Number(estimatedTime),
+        difficultyLevel: Number(trailDifficulty),
         isCircular,
-        mountainId: Number(id),
       });
       setTrailName('');
-      setLengthKm('');
-      setDifficulty('קל');
+      setTrailLength('');
+      setEstimatedTime('');
+      setTrailDifficulty('3');
       setIsCircular(false);
       setShowAddTrail(false);
       fetchMountainData();
     } catch (err) {
-      setErrorMsg(getApiErrorMessage(err, 'שגיאה בהוספת מסלול'));
+      setErrorMsg(getApiErrorMessage(err, 'שגיאה בהוספת המסלול'));
     }
   };
 
@@ -99,7 +90,7 @@ export function MountainDetailsPage() {
       await axiosClient.delete(`/trails/${trailId}`);
       fetchMountainData();
     } catch (err) {
-      setErrorMsg(getApiErrorMessage(err, 'שגיאה במחיקת מסלול'));
+      setErrorMsg(getApiErrorMessage(err, 'שגיאה במחיקת המסלול'));
     }
   };
 
@@ -108,17 +99,15 @@ export function MountainDetailsPage() {
     e.preventDefault();
     if (!id) return;
     try {
-      setErrorMsg('');
-      await axiosClient.post('/reviews', {
-        mountainId: Number(id),
+      await axiosClient.post(`/mountains/${id}/reviews`, {
         rating: Number(rating),
         comment,
       });
-      setComment('');
       setRating('5');
+      setComment('');
       fetchMountainData();
     } catch (err) {
-      setErrorMsg(getApiErrorMessage(err, 'שגיאה בהוספת ביקורת'));
+      setErrorMsg(getApiErrorMessage(err, 'שגיאה בשליחת הביקורת'));
     }
   };
 
@@ -128,64 +117,44 @@ export function MountainDetailsPage() {
       await axiosClient.delete(`/reviews/${reviewId}`);
       fetchMountainData();
     } catch (err) {
-      setErrorMsg(getApiErrorMessage(err, 'שגיאה במחיקת ביקורת'));
+      setErrorMsg(getApiErrorMessage(err, 'שגיאה במחיקת הביקורת'));
     }
   };
 
-  if (!mountain) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  const isUserAdmin = user?.role === 'Admin';
-
   return (
-    <Box sx={{ maxWidth: 900, mx: 'auto', p: 3 }}>
+    <Container maxWidth="md" sx={{ mt: 4, mb: 6 }}>
+      <Button component={RouterLink} to="/" variant="outlined" size="small" sx={{ mb: 2 }}>
+        חזרה לכל ההרים
+      </Button>
+
       {errorMsg && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {errorMsg}
         </Alert>
       )}
 
-      <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          {mountain.name}
-        </Typography>
-
-        <Typography variant="body1" color="text.secondary" gutterBottom>
-          מיקום: {mountain.location} | גובה: {mountain.height} מטר
-        </Typography>
-
-        {mountain.imageUrl && (
-          <CardMedia
-            component="img"
-            image={mountain.imageUrl}
-            alt={mountain.name}
-            sx={{ maxHeight: 400, objectFit: 'cover', borderRadius: 2, my: 2 }}
-          />
-        )}
-
-        <Typography variant="body1" sx={{ mt: 2 }}>
-          {mountain.description}
-        </Typography>
-      </Paper>
+      {mountain && (
+        <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h4" fontWeight="bold" gutterBottom>
+            {mountain.name}
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+            מיקום: {mountain.location} | גובה: {mountain.height} מטר | רמת קושי: {mountain.difficultyLevel}/5
+          </Typography>
+          {mountain.description && (
+            <Typography variant="body1" sx={{ mt: 1 }}>
+              {mountain.description}
+            </Typography>
+          )}
+        </Paper>
+      )}
 
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         <Typography variant="h5" fontWeight="bold" gutterBottom>
-          מסלולי הליכה בהר ({user ? trails.length : 0})
+          מסלולי הליכה בהר ({trails.length})
         </Typography>
 
-        {!user ? (
-          <Alert severity="info" sx={{ mt: 1, alignItems: 'center' }}>
-            יש להתחבר למערכת כדי לצפות במסלולי ההליכה של ההר.
-            <Button component={RouterLink} to="/login" variant="contained" size="small" sx={{ mr: 2 }}>
-              להתחברות
-            </Button>
-          </Alert>
-        ) : trails.length === 0 ? (
+        {trails.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             עדיין לא נוספו מסלולים להר זה.
           </Typography>
@@ -194,13 +163,11 @@ export function MountainDetailsPage() {
             <Box
               key={trail.id}
               sx={{
-                p: 2,
-                mb: 1.5,
-                borderRadius: 1,
-                bgcolor: 'grey.50',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                py: 1.5,
+                borderBottom: '1px solid #eee',
               }}
             >
               <Box>
@@ -208,140 +175,172 @@ export function MountainDetailsPage() {
                   {trail.name}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  אורך: {trail.lengthKm} ק"מ | דרגת קושי: {trail.difficulty} | {trail.isCircular ? 'מעגלי' : 'קווי'}
+                  אורך: {trail.length} ק&quot;מ | זמן משוער: {trail.estimatedTime} דקות | קושי: {trail.difficultyLevel}/5 |{' '}
+                  {trail.isCircular ? 'מסלול מעגלי' : 'מסלול קווי'}
                 </Typography>
               </Box>
-
-              {isUserAdmin && (
-                <IconButton color="error" onClick={() => handleDeleteTrail(trail.id)}>
-                  <DeleteIcon />
-                </IconButton>
+              {user?.role === 'admin' && (
+                <Button
+                  size="small"
+                  color="error"
+                  onClick={() => handleDeleteTrail(trail.id)}
+                >
+                  מחק מסלול
+                </Button>
               )}
             </Box>
           ))
         )}
 
-        {isUserAdmin && (
+        {user && !showAddTrail && (
           <Box sx={{ mt: 2 }}>
-            {!showAddTrail ? (
-              <Button variant="outlined" onClick={() => setShowAddTrail(true)}>
-                הוסף מסלול חדש
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setShowAddTrail(true)}
+            >
+              + הוספת מסלול חדש להר
+            </Button>
+          </Box>
+        )}
+
+        {user && showAddTrail && (
+          <Box component="form" onSubmit={handleAddTrail} sx={{ mt: 3 }}>
+            <Divider sx={{ mb: 2 }} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="subtitle1" fontWeight="bold">
+                הוספת מסלול חדש להר
+              </Typography>
+              <Button size="small" color="inherit" onClick={() => setShowAddTrail(false)}>
+                ביטול
               </Button>
-            ) : (
-              <Box component="form" onSubmit={handleAddTrail} sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <TextField
-                  size="small"
-                  label="שם המסלול"
-                  value={trailName}
-                  onChange={(e) => setTrailName(e.target.value)}
-                  required
-                />
-                <TextField
-                  size="small"
-                  label="אורך בקילומטרים"
-                  type="number"
-                  inputProps={{ step: '0.1' }}
-                  value={lengthKm}
-                  onChange={(e) => setLengthKm(e.target.value)}
-                  required
-                />
-                <TextField
-                  size="small"
-                  select
-                  label="דרגת קושי"
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value)}
-                >
-                  <MenuItem value="קל">קל</MenuItem>
-                  <MenuItem value="בינוני">בינוני</MenuItem>
-                  <MenuItem value="קשה">קשה</MenuItem>
-                  <MenuItem value="למיטיבי לכת">למיטיבי לכת</MenuItem>
-                </TextField>
-                <FormControlLabel
-                  control={<Switch checked={isCircular} onChange={(e) => setIsCircular(e.target.checked)} />}
-                  label="מסלול מעגלי"
-                />
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button type="submit" variant="contained">
-                    שמור מסלול
-                  </Button>
-                  <Button variant="text" onClick={() => setShowAddTrail(false)}>
-                    ביטול
-                  </Button>
-                </Box>
-              </Box>
-            )}
+            </Box>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+              <TextField
+                size="small"
+                label="שם המסלול"
+                value={trailName}
+                onChange={(e) => setTrailName(e.target.value)}
+                required
+              />
+              <TextField
+                size="small"
+                label="אורך (ק״מ)"
+                type="number"
+                inputProps={{ step: '0.1' }}
+                value={trailLength}
+                onChange={(e) => setTrailLength(e.target.value)}
+                required
+              />
+              <TextField
+                size="small"
+                label="זמן משוער (דקות)"
+                type="number"
+                value={estimatedTime}
+                onChange={(e) => setEstimatedTime(e.target.value)}
+                required
+              />
+              <TextField
+                size="small"
+                label="רמת קושי (1-5)"
+                type="number"
+                inputProps={{ min: 1, max: 5 }}
+                value={trailDifficulty}
+                onChange={(e) => setTrailDifficulty(e.target.value)}
+                required
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isCircular}
+                    onChange={(e) => setIsCircular(e.target.checked)}
+                  />
+                }
+                label="מסלול מעגלי"
+              />
+              <Button type="submit" variant="contained" size="small">
+                שמור מסלול
+              </Button>
+            </Box>
           </Box>
         )}
       </Paper>
 
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Typography variant="h5" fontWeight="bold" gutterBottom>
-          חוות דעת וביקורות ({reviews.length})
+          ביקורות ודירוגים של מטיילים ({reviews.length})
         </Typography>
 
         {reviews.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            עדיין אין ביקורות על הר זה. היה הראשון לכתוב!
+            עדיין אין ביקורות להר זה. היו הראשונים לדרג!
           </Typography>
         ) : (
-          reviews.map((rev) => (
-            <Box key={rev.id} sx={{ mb: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="subtitle2" fontWeight="bold">
-                    {rev.user ? `${rev.user.firstName} ${rev.user.lastName}` : 'משתמש אנונימי'}
+          reviews.map((review) => (
+            <Box
+              key={review.id}
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                py: 1.5,
+                borderBottom: '1px solid #eee',
+              }}
+            >
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Chip size="small" color="secondary" label={`דירוג: ${review.rating}/5`} />
+                  <Typography variant="caption" color="text.secondary">
+                    נכתב על ידי: {review.user?.firstName || review.user?.email || `משתמש #${review.userId}`}
                   </Typography>
-                  <Rating value={rev.rating} size="small" readOnly />
                 </Box>
-
-                {(isUserAdmin || user?.id === rev.userId) && (
-                  <IconButton size="small" color="error" onClick={() => handleDeleteReview(rev.id)}>
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                )}
+                <Typography variant="body2">{review.comment}</Typography>
               </Box>
-
-              <Typography variant="body2" sx={{ mt: 0.5 }}>
-                {rev.comment}
-              </Typography>
-              <Divider sx={{ mt: 1.5 }} />
+              {user && (Number(user.sub) === Number(review.userId) || user.role === 'admin') && (
+                <Button
+                  size="small"
+                  color="error"
+                  onClick={() => handleDeleteReview(review.id)}
+                >
+                  מחק ביקורת
+                </Button>
+              )}
             </Box>
           ))
         )}
 
-        {user ? (
-          <Box component="form" onSubmit={handleAddReview} sx={{ mt: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="subtitle1" fontWeight="bold">
-              הוספת ביקורת
+        {user && (
+          <Box component="form" onSubmit={handleAddReview} sx={{ mt: 3 }}>
+            <Divider sx={{ mb: 2 }} />
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+              כתיבת ביקורת חדשה
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography component="legend">דירוג:</Typography>
-              <Rating
-                name="rating-select"
-                value={Number(rating)}
-                onChange={(_, val) => setRating(String(val || 5))}
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+              <TextField
+                size="small"
+                label="דירוג (1-5)"
+                type="number"
+                inputProps={{ min: 1, max: 5 }}
+                value={rating}
+                onChange={(e) => setRating(e.target.value)}
+                 sx={{ width: 120 }}
+                required
               />
+              <TextField
+                size="small"
+                fullWidth
+                label="תוכן הביקורת שלך..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                required
+              />
+              <Button type="submit" variant="contained" color="secondary" size="small">
+                שלח ביקורת
+              </Button>
             </Box>
-            <TextField
-              size="small"
-              multiline
-              rows={3}
-              label="כתוב חוות דעת..."
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              required
-            />
-            <Button type="submit" variant="contained" sx={{ alignSelf: 'flex-start' }}>
-              שלח ביקורת
-            </Button>
           </Box>
-        ) : (
-          <Alert severity="info" sx={{ mt: 2 }}>
-            יש להתחבר כדי לכתוב ביקורת.
-          </Alert>
         )}
       </Paper>
-    </Box>
+    </Container>
   );
 }

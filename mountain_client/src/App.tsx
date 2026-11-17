@@ -1,11 +1,21 @@
 import { useEffect } from 'react';
 import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { MountainsPage } from './pages/MountainsPage';
 import { MountainDetailsPage } from './pages/MountainDetailsPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { useAuth } from './context/AuthContext';
+
+// (#30)
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
 
 // (#30)
 const rtlTheme = createTheme({
@@ -31,8 +41,22 @@ export default function App() {
       <BrowserRouter>
         <Navbar />
         <Routes>
-          <Route path="/" element={<MountainsPage />} />
-          <Route path="/mountains/:id" element={<MountainDetailsPage />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <MountainsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mountains/:id"
+            element={
+              <ProtectedRoute>
+                <MountainDetailsPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Routes>
